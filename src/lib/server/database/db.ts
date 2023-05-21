@@ -1,10 +1,8 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
 
-const client = new Pool({
-	connectionString: 'postgresql://admin:password123@localhost:5432/deftly'
-});
+const client = postgres('postgresql://admin:password123@localhost:5432/deftly');
 
-export const db = drizzle(client, { logger: true });
+export const db = drizzle(client, { logger: false });
 
 export default db;

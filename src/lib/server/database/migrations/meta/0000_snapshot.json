@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "pg",
-  "id": "9fa29835-d233-4053-b3ea-cbee168c109e",
+  "id": "e58fecbd-856c-4eaf-9eba-411cd089370b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "auth_keys": {
@@ -45,12 +45,8 @@
           "name": "auth_keys_user_id_users_id_fk",
           "tableFrom": "auth_keys",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -92,12 +88,8 @@
           "name": "auth_sessions_user_id_users_id_fk",
           "tableFrom": "auth_sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
