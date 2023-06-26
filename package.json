@@ -34,10 +34,10 @@
   },
   "type": "module",
   "dependencies": {
-    "@lucia-auth/adapter-test": "^3.0.1",
+    "@lucia-auth/adapter-test": "4.0.0-beta.2",
     "drizzle-orm": "^0.25.4",
     "drizzle-zod": "^0.4.1",
-    "lucia-auth": "^1.6.0",
+    "lucia": "2.0.0-beta.2",
     "postgres": "^3.3.4"
   }
 }

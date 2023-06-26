@@ -1,17 +1,16 @@
-import type { Adapter, AdapterFunction } from 'lucia-auth';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
+import type { Adapter, InitializeAdapter } from 'lucia';
+
 import type { DrizzleAdapterOptions } from '$lib/server/lucia/types';
-import { users } from '$lib/schema';
-import { z } from 'zod';
-import { createInsertSchema } from 'drizzle-zod';
+import {
+  FK_VIOLATION_CODE,
+  UNIQUE_VIOLATION_CODE,
+  isConstraintError,
+} from '$lib/utils/is-constraint-error';
 
-const newUserValidator = createInsertSchema(users, {
-  id: z.string(),
-  username: z.string(),
-});
-
+// TODO: split up user and session adapter to use Redis for sessions
 export const pgAdapter =
-  ({ db, users, sessions, keys }: DrizzleAdapterOptions): AdapterFunction<Adapter> =>
+  ({ db, users, sessions, keys }: DrizzleAdapterOptions): InitializeAdapter<Adapter> =>
   (LuciaError) => {
     const adapter = {
       async deleteKeysByUserId(userId) {
@@ -19,9 +18,6 @@ export const pgAdapter =
       },
       async deleteSession(sessionId) {
         await db.delete(sessions).where(eq(sessions.id, sessionId));
-      },
-      async deleteNonPrimaryKey(key) {
-        await db.delete(keys).where(and(eq(keys.id, key), eq(keys.primary_key, false)));
       },
       async deleteSessionsByUserId(userId) {
         await db.delete(sessions).where(eq(sessions.user_id, userId));
@@ -32,114 +28,100 @@ export const pgAdapter =
       async getKeysByUserId(userId) {
         return await db.select().from(keys).where(eq(keys.user_id, userId));
       },
-      async getKey(keyId, shouldDataBeDeleted) {
-        const key = (await db.select().from(keys).where(eq(keys.id, keyId)))[0];
-
-        if (await shouldDataBeDeleted(key)) {
-          await db.delete(keys).where(eq(keys.id, keyId));
-        }
-        return key;
+      async getKey(keyId) {
+        const [key] = await db.select().from(keys).where(eq(keys.id, keyId));
+        return key ?? null;
       },
       async getSession(sessionId) {
-        return (
-          (await db.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1))[0] ?? null
-        );
+        const [session] = await db
+          .select()
+          .from(sessions)
+          .where(eq(sessions.id, sessionId))
+          .limit(1);
+        return session ?? null;
+      },
+      async updateSession(keyId, partialKey) {
+        const updatedSessions = await db
+          .update(sessions)
+          .set(partialKey)
+          .where(eq(sessions.id, keyId))
+          .returning();
+
+        if (updatedSessions.length === 0) {
+          throw new LuciaError('AUTH_INVALID_SESSION_ID');
+        }
       },
       async getSessionsByUserId(userId) {
         return db.select().from(sessions).where(eq(sessions.user_id, userId));
       },
       async getUser(userId) {
-        const res = await db.select().from(users).where(eq(users.id, userId));
-        return res.length === 0 ? null : res[0];
+        const [user] = await db.select().from(users).where(eq(users.id, userId));
+        return user ?? null;
       },
       async setKey(key) {
         try {
           await db.insert(keys).values(key);
-        } catch (e) {
-          if (typeof e === 'object' && e !== null && 'code' in e && e.code === '23503') {
+        } catch (err) {
+          if (isConstraintError(err, FK_VIOLATION_CODE)) {
             throw new LuciaError('AUTH_INVALID_USER_ID');
           }
-          if (typeof e === 'object' && e !== null && 'code' in e && e.code === '23505') {
+          if (isConstraintError(err, UNIQUE_VIOLATION_CODE)) {
             throw new LuciaError('AUTH_DUPLICATE_KEY_ID');
           }
+          throw err;
         }
       },
       async setSession(session) {
         try {
-          await db.insert(sessions).values({
-            ...session,
-            active_expires: Number(session.active_expires),
-            idle_expires: Number(session.idle_expires),
-          });
-        } catch (e) {
-          if (typeof e === 'object' && e !== null && 'code' in e && e.code === '23503') {
+          await db.insert(sessions).values(session);
+        } catch (err) {
+          if (isConstraintError(err, FK_VIOLATION_CODE)) {
             throw new LuciaError('AUTH_INVALID_USER_ID');
           }
-          if (typeof e === 'object' && e !== null && 'code' in e && e.code === '23505') {
-            throw new LuciaError('AUTH_DUPLICATE_SESSION_ID');
-          }
+          throw err;
         }
       },
-      async setUser(userId, userAttributes, key) {
-        const user = { id: userId, ...userAttributes };
-        // Will throw zod validation error for us to deal with later
-        const parsedUser = newUserValidator.parse(user);
-        // TODO: validate the insert returns actually have a row
+      async setUser(user, key) {
         if (!key) {
-          const inserted = await db.insert(users).values(parsedUser).returning();
-          return inserted[0];
+          await db.insert(users).values(user).returning();
+          return;
         }
         try {
-          const res = await db.transaction(async (tx) => {
-            const user = await tx.insert(users).values(parsedUser).returning();
+          await db.transaction(async (tx) => {
+            await tx.insert(users).values(user).returning();
             await tx.insert(keys).values(key);
-            return user;
           });
-          return res[0];
-        } catch (e) {
-          if (typeof e === 'object' && e !== null && 'code' in e && e.code === '23505') {
+        } catch (err) {
+          if (isConstraintError(err, UNIQUE_VIOLATION_CODE)) {
             throw new LuciaError('AUTH_DUPLICATE_KEY_ID');
           }
-          throw e;
+          throw err;
         }
       },
-      async updateKeyPassword(key, hashedPassword) {
-        const res = await db
-          .update(keys)
-          .set({ hashed_password: hashedPassword })
-          .where(eq(keys.id, key))
-          .returning();
-
-        if (!res.length) {
-          throw new LuciaError('AUTH_INVALID_KEY_ID');
-        }
-      },
-      async updateUserAttributes(userId, attributes) {
+      async updateUser(userId, attributes) {
         const updatedUsers = await db
           .update(users)
           .set(attributes)
           .where(eq(users.id, userId))
           .returning();
 
-        if (updatedUsers.length > 0) {
-          return updatedUsers[0];
+        if (updatedUsers.length === 0) {
+          throw new LuciaError('AUTH_INVALID_USER_ID');
         }
-        throw new LuciaError('AUTH_INVALID_USER_ID');
       },
-      async getSessionAndUserBySessionId(sessionId) {
-        const res = (
-          await db
-            .select()
-            .from(sessions)
-            .where(eq(sessions.id, sessionId))
-            .innerJoin(users, eq(users.id, sessions.user_id))
-            .limit(1)
-        )[0];
-        if (!res) {
-          return null;
-        }
+      async updateKey(keyId, partialKey) {
+        const updatedKeys = await db
+          .update(keys)
+          .set(partialKey)
+          .where(eq(keys.id, keyId))
+          .returning();
 
-        return { user: res.users, session: res.auth_sessions };
+        if (updatedKeys.length === 0) {
+          throw new LuciaError('AUTH_INVALID_KEY_ID');
+        }
+      },
+      async deleteKey(keyId) {
+        await db.delete(keys).where(eq(keys.id, keyId));
       },
     } satisfies Adapter;
 

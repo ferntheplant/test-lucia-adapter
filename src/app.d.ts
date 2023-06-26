@@ -11,8 +11,11 @@ declare global {
 
 declare namespace Lucia {
   type Auth = any;
-  type UserAttributes = {
+  type DatabaseUserAttributes = {
     username: string;
+  };
+  type DatabaseSessionAttributes = {
+    name: string;
   };
 }
 

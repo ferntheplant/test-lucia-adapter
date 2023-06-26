@@ -11,7 +11,7 @@ services:
       - POSTGRES_PASSWORD=password123
     volumes:
       #SQL files mounted to entrypoint folder are run in alphabetical order
-      - ./src/lib/server/database/migrations/0000_steady_next_avengers.sql:/docker-entrypoint-initdb.d/a.sql
+      - ./src/lib/server/database/migrations/0000_elite_giant_girl.sql:/docker-entrypoint-initdb.d/a.sql
     healthcheck:
       test: ['CMD', 'pg_isready', '-h', 'postgres']
       interval: 1m30s

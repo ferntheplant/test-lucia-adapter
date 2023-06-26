@@ -1,16 +1,15 @@
 CREATE TABLE IF NOT EXISTS "auth_keys" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
-	"primary_key" boolean NOT NULL,
-	"hashed_password" text,
-	"expires" bigint
+	"hashed_password" text
 );
 
 CREATE TABLE IF NOT EXISTS "auth_sessions" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"active_expires" bigint NOT NULL,
-	"idle_expires" bigint NOT NULL
+	"idle_expires" bigint NOT NULL,
+	"country" text
 );
 
 CREATE TABLE IF NOT EXISTS "users" (

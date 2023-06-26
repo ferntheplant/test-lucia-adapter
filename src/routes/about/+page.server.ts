@@ -1,13 +1,14 @@
 import type { PageServerLoad } from './$types';
 import { pgAdapter } from '$lib/server/lucia/adapter';
 import { testAdapter } from '@lucia-auth/adapter-test';
-import type { LuciaQueryHandler, TestUserSchema } from '@lucia-auth/adapter-test';
-import type { SessionSchema, KeySchema } from 'lucia-auth';
-import { LuciaError } from 'lucia-auth';
+import type { QueryHandler, TestSessionSchema, TestUserSchema } from '@lucia-auth/adapter-test';
+import { Database } from '@lucia-auth/adapter-test';
+import type { KeySchema } from 'lucia';
+import { LuciaError } from 'lucia';
 import { users, authKeys, authSessions } from '$lib/schema';
 import db from '$lib/server/database/db';
 
-const queryHandler: LuciaQueryHandler = {
+const queryHandler: QueryHandler = {
   user: {
     get: async () => {
       return await db.select().from(users);
@@ -23,15 +24,8 @@ const queryHandler: LuciaQueryHandler = {
     get: async () => {
       return await db.select().from(authSessions);
     },
-    insert: async (data: SessionSchema) => {
-      await db.insert(authSessions).values(
-        data as {
-          id: string;
-          active_expires: number;
-          user_id: string;
-          idle_expires: number;
-        },
-      );
+    insert: async (data: TestSessionSchema) => {
+      await db.insert(authSessions).values(data);
     },
     clear: async () => {
       await db.delete(authSessions);
@@ -58,7 +52,7 @@ async function test() {
     keys: authKeys,
     type: 'pg',
   })(LuciaError);
-  await testAdapter(adapter, queryHandler, false);
+  await testAdapter(adapter, new Database(queryHandler));
 }
 
 export const load: PageServerLoad = async () => {

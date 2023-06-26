@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "pg",
-  "id": "e58fecbd-856c-4eaf-9eba-411cd089370b",
+  "id": "684f5976-f06c-4461-920f-b6e8cef92825",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "auth_keys": {
@@ -20,21 +20,9 @@
           "primaryKey": false,
           "notNull": true
         },
-        "primary_key": {
-          "name": "primary_key",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        },
         "hashed_password": {
           "name": "hashed_password",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expires": {
-          "name": "expires",
-          "type": "bigint",
           "primaryKey": false,
           "notNull": false
         }
@@ -80,6 +68,12 @@
           "type": "bigint",
           "primaryKey": false,
           "notNull": true
+        },
+        "country": {
+          "name": "country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
